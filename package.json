@@ -1,0 +1,21 @@
+{
+  "name": "supmeca-planning",
+  "version": "1.0.0",
+  "description": "Visualiseur d'emploi du temps Supmeca via Aurion",
+  "main": "server.js",
+  "scripts": {
+    "server": "node server.js",
+    "dev": "npx -y serve -s . -l 5173 --cors",
+    "start": "node server.js"
+  },
+  "keywords": ["supmeca", "aurion", "planning"],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "puppeteer": "^24.37.5",
+    "xml-js": "^1.6.11"
+  }
+}
