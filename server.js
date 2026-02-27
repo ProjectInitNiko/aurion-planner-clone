@@ -2,12 +2,16 @@ const express = require('express');
 const cors = require('cors');
 const puppeteer = require('puppeteer');
 const convert = require('xml-js');
+const path = require('path');
 
 const app = express();
 const PORT = 3001;
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+
+// Serve static frontend files (index.html, style.css, main.js)
+app.use(express.static(path.join(__dirname)));
 
 // Store active browser sessions (in-memory, keyed by a simple session token)
 const sessions = new Map();
