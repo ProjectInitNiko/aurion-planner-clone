@@ -134,6 +134,45 @@ async function handleLogin(e) {
     loginError.hidden = true;
 
     try {
+        // Step 1: Try to load cached events for instant display
+        let showedCache = false;
+        try {
+            const cacheRes = await fetch(`${API_BASE}/api/cached-events`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username }),
+            });
+            const cacheData = await cacheRes.json();
+
+            if (cacheData.events && cacheData.events.length > 0) {
+                state.username = username;
+                state.events = cacheData.events;
+                showSchedule();
+                showedCache = true;
+
+                // If cache is fresh, we can skip the full login
+                if (cacheData.fresh) {
+                    console.log('[login] Cache is fresh, skipping Aurion scraping');
+                    // Still do the login to get a token for navigation
+                    fetch(`${API_BASE}/api/login-and-fetch`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password }),
+                    }).then(res => res.json()).then(data => {
+                        if (data.token) state.token = data.token;
+                        if (data.events && !data.fromCache) {
+                            state.events = data.events;
+                            renderSchedule();
+                        }
+                    }).catch(() => { });
+                    return;
+                }
+            }
+        } catch (e) {
+            console.log('[login] No cache available, proceeding with login');
+        }
+
+        // Step 2: Full login & fetch from Aurion
         const res = await fetch(`${API_BASE}/api/login-and-fetch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -151,18 +190,22 @@ async function handleLogin(e) {
         state.username = username;
         state.events = data.events || [];
 
-        // Cache the data
+        // Cache the data locally too
         localStorage.setItem('supmeca_planning_cache', JSON.stringify({
             events: state.events,
             username: state.username,
             cachedAt: new Date().toISOString(),
         }));
 
-        showSchedule();
+        if (showedCache) {
+            // Update the already-visible schedule with fresh data
+            renderSchedule();
+        } else {
+            showSchedule();
+        }
     } catch (error) {
         loginError.textContent = error.message;
         loginError.hidden = false;
-        // Re-trigger shake animation
         loginError.style.animation = 'none';
         requestAnimationFrame(() => { loginError.style.animation = ''; });
     } finally {

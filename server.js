@@ -3,6 +3,7 @@ const cors = require('cors');
 const puppeteer = require('puppeteer');
 const convert = require('xml-js');
 const path = require('path');
+const { getCachedEvents, saveEvents, isCacheFresh } = require('./supabaseClient');
 
 const app = express();
 const PORT = 3001;
@@ -121,6 +122,23 @@ app.post('/api/login-and-fetch', async (req, res) => {
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Identifiant et mot de passe requis' });
+  }
+
+  // Check Supabase cache first
+  try {
+    const cached = await getCachedEvents(username);
+    if (cached && isCacheFresh(cached.lastUpdated, 2)) {
+      console.log(`[login] Returning ${cached.events.length} cached events for ${username} (fresh)`);
+      return res.json({
+        token: generateToken(),
+        events: cached.events,
+        fromCache: true,
+        cachedAt: cached.lastUpdated,
+        message: `${cached.events.length} événements (cache). Données mises à jour il y a moins de 2h.`,
+      });
+    }
+  } catch (e) {
+    console.warn('[login] Cache check failed, proceeding with Aurion:', e.message);
   }
 
   let browser;
@@ -380,9 +398,15 @@ app.post('/api/login-and-fetch', async (req, res) => {
       username,
     });
 
+    // Save events to Supabase cache
+    saveEvents(username, processedEvents).catch(e => {
+      console.warn('[login] Failed to cache events:', e.message);
+    });
+
     res.json({
       token,
       events: processedEvents,
+      fromCache: false,
       message: `Connecté en tant que ${username}. ${processedEvents.length} événements trouvés.`,
     });
 
@@ -504,6 +528,34 @@ app.post('/api/logout', async (req, res) => {
 });
 
 /**
+ * POST /api/cached-events
+ * Body: { username }
+ * Returns cached events from Supabase (no Aurion login needed)
+ */
+app.post('/api/cached-events', async (req, res) => {
+  const { username } = req.body;
+  if (!username) {
+    return res.status(400).json({ error: 'Username requis' });
+  }
+
+  try {
+    const cached = await getCachedEvents(username);
+    if (cached && cached.events.length > 0) {
+      console.log(`[cache] Returning ${cached.events.length} cached events for ${username}`);
+      return res.json({
+        events: cached.events,
+        cachedAt: cached.lastUpdated,
+        fresh: isCacheFresh(cached.lastUpdated, 2),
+      });
+    }
+    res.json({ events: [], cachedAt: null, fresh: false });
+  } catch (error) {
+    console.error('[cache] Error:', error.message);
+    res.json({ events: [], cachedAt: null, fresh: false });
+  }
+});
+
+/**
  * GET /api/health
  */
 app.get('/api/health', (req, res) => {
@@ -514,6 +566,7 @@ app.listen(PORT, () => {
   console.log(`\n🚀 Supmeca Planning Server running on http://localhost:${PORT}`);
   console.log(`📡 API endpoints:`);
   console.log(`   POST /api/login-and-fetch  - Login & fetch planning`);
+  console.log(`   POST /api/cached-events    - Get cached events`);
   console.log(`   POST /api/navigate         - Navigate calendar`);
   console.log(`   POST /api/logout           - Logout`);
   console.log(`   GET  /api/health           - Health check\n`);
