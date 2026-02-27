@@ -21,7 +21,7 @@ setInterval(() => {
   const now = Date.now();
   for (const [token, session] of sessions) {
     if (now - session.lastUsed > 30 * 60 * 1000) {
-      session.browser.close().catch(() => {});
+      session.browser.close().catch(() => { });
       sessions.delete(token);
       console.log(`[cleanup] Session ${token.substring(0, 8)}... expired`);
     }
@@ -129,6 +129,7 @@ app.post('/api/login-and-fetch', async (req, res) => {
 
     browser = await puppeteer.launch({
       headless: 'new',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -214,7 +215,7 @@ app.post('/api/login-and-fetch', async (req, res) => {
     }
 
     // Wait for the planning page to load
-    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {});
+    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => { });
     await new Promise(resolve => setTimeout(resolve, 5000));
 
     console.log('[login] Planning page loaded, extracting events...');
@@ -387,7 +388,7 @@ app.post('/api/login-and-fetch', async (req, res) => {
 
   } catch (error) {
     console.error('[login] Error:', error.message);
-    if (browser) await browser.close().catch(() => {});
+    if (browser) await browser.close().catch(() => { });
     res.status(500).json({
       error: `Erreur lors de la connexion: ${error.message}`,
     });
@@ -496,7 +497,7 @@ app.post('/api/logout', async (req, res) => {
   const { token } = req.body;
   const session = sessions.get(token);
   if (session) {
-    await session.browser.close().catch(() => {});
+    await session.browser.close().catch(() => { });
     sessions.delete(token);
   }
   res.json({ message: 'Déconnecté' });

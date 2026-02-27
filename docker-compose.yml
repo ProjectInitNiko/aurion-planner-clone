@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  supmeca-planning:
+    build: .
+    container_name: supmeca-planning
+    restart: unless-stopped
+    ports:
+      - '3001:3001'
+    environment:
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
