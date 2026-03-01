@@ -321,7 +321,7 @@ function renderWeekView() {
     const timeCol = document.createElement('div');
     timeCol.className = 'time-column';
 
-    // Spacer to match the day-column-header height
+    // Spacer to match the day-column-header height (set dynamically after render)
     const spacer = document.createElement('div');
     spacer.className = 'time-column-spacer';
     timeCol.appendChild(spacer);
@@ -373,6 +373,14 @@ function renderWeekView() {
     });
 
     weekView.hidden = false;
+
+    // Dynamically match time-column spacer to actual header height
+    requestAnimationFrame(() => {
+        const header = weekView.querySelector('.day-column-header');
+        if (header && spacer) {
+            spacer.style.height = header.offsetHeight + 'px';
+        }
+    });
 }
 
 function createWeekEvent(event, index) {
