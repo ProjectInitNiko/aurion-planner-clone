@@ -797,6 +797,10 @@ body {
   transform: translateY(-7px);
 }
 
+.time-column-spacer {
+  height: 48px; /* matches .day-column-header height */
+}
+
 /* Day columns */
 .day-column {
   position: relative;

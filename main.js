@@ -320,6 +320,12 @@ function renderWeekView() {
     // Time column
     const timeCol = document.createElement('div');
     timeCol.className = 'time-column';
+
+    // Spacer to match the day-column-header height
+    const spacer = document.createElement('div');
+    spacer.className = 'time-column-spacer';
+    timeCol.appendChild(spacer);
+
     for (let h = 8; h <= 20; h++) {
         const label = document.createElement('div');
         label.className = 'time-label';
