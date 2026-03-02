@@ -391,7 +391,10 @@ function createWeekEvent(event, index) {
     const startHour = start.getHours() + start.getMinutes() / 60;
     const endHour = end.getTime() ? (end.getHours() + end.getMinutes() / 60) : (startHour + 1);
 
-    const hourHeight = 70; // matches CSS --hour-height
+    // Read --hour-height dynamically from CSS to support responsive changes (mobile uses 60)
+    const cssHourHeightStr = getComputedStyle(document.documentElement).getPropertyValue('--hour-height').trim();
+    const hourHeight = parseInt(cssHourHeightStr) || 70;
+
     const top = (startHour - 8) * hourHeight;
     const height = Math.max((endHour - startHour) * hourHeight, 25);
 
