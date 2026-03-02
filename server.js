@@ -238,140 +238,20 @@ app.post('/api/login-and-fetch', async (req, res) => {
 
     console.log('[login] Planning page loaded, extracting events...');
 
-    // Try to switch to month view if available
+    // Try to switch to month view for faster scraping
     const monthButton = await page.$('.fc-right > button.fc-month-button, .fc-month-button, button[title="mois"], button[title="Mois"]');
     if (monthButton) {
       await monthButton.click();
       await new Promise(resolve => setTimeout(resolve, 3000));
+      console.log('[login] Switched to month view');
     }
 
-    // Set up response interceptor for calendar data
-    let calendarEvents = [];
-
-    // Method 1: Try to extract events directly from FullCalendar's internal data
-    calendarEvents = await page.evaluate(() => {
-      // FullCalendar v3/v4/v5 - try to get events from the calendar object
-      const calEl = document.querySelector('.fc, [class*="fullcalendar"], #calendar, .schedule-calendar');
-      if (calEl) {
-        // Try jQuery-based FullCalendar (v3)
-        if (typeof jQuery !== 'undefined' || typeof $ !== 'undefined') {
-          try {
-            const $cal = (typeof jQuery !== 'undefined' ? jQuery : $)(calEl);
-            const fc = $cal.fullCalendar || $cal.data('fullCalendar');
-            if (fc) {
-              const events = $cal.fullCalendar('clientEvents');
-              return events.map(e => ({
-                id: e.id || e._id,
-                title: e.title || '',
-                start: e.start ? (e.start.toISOString ? e.start.toISOString() : e.start.format ? e.start.format() : String(e.start)) : '',
-                end: e.end ? (e.end.toISOString ? e.end.toISOString() : e.end.format ? e.end.format() : String(e.end)) : '',
-                className: typeof e.className === 'string' ? e.className : (Array.isArray(e.className) ? e.className.join(' ') : ''),
-                allDay: e.allDay || false,
-              }));
-            }
-          } catch (e) { /* ignore */ }
-        }
-      }
-      return [];
-    });
-
-    // Method 2: If no events found, try to intercept by navigating months
-    if (calendarEvents.length === 0) {
-      console.log('[login] Method 1 failed, trying response interception...');
-
-      // Set up response listener
-      const eventPromise = new Promise((resolve) => {
-        const timeout = setTimeout(() => resolve([]), 15000);
-
-        page.on('response', async (response) => {
-          try {
-            const contentType = response.headers()['content-type'] || '';
-            if (contentType.includes('xml') || contentType.includes('json')) {
-              const text = await response.text();
-
-              // Try XML parsing (Aurion uses JSF partial responses)
-              if (contentType.includes('xml') && text.includes('partial-response')) {
-                try {
-                  const jsonResult = JSON.parse(convert.xml2json(text, { compact: true, spaces: 2 }));
-                  const updates = jsonResult['partial-response']?.['changes']?.['update'];
-                  if (updates) {
-                    const updateArray = Array.isArray(updates) ? updates : [updates];
-                    for (const update of updateArray) {
-                      const cdata = update['_cdata'];
-                      if (cdata) {
-                        try {
-                          const parsed = JSON.parse(cdata);
-                          if (parsed.events && Array.isArray(parsed.events)) {
-                            clearTimeout(timeout);
-                            resolve(parsed.events);
-                            return;
-                          }
-                        } catch (e) { /* not JSON */ }
-                      }
-                    }
-                  }
-                } catch (e) { /* not valid xml */ }
-              }
-
-              // Try direct JSON
-              if (contentType.includes('json')) {
-                try {
-                  const parsed = JSON.parse(text);
-                  if (parsed.events && Array.isArray(parsed.events)) {
-                    clearTimeout(timeout);
-                    resolve(parsed.events);
-                    return;
-                  }
-                } catch (e) { /* not JSON */ }
-              }
-            }
-          } catch (e) { /* ignore */ }
-        });
-      });
-
-      // Trigger a calendar navigation to generate a response
-      const nextButton = await page.$('.fc-next-button, .fc-right > .fc-button-group > button:last-child, button[title="suivant"], button[title="Suivant"]');
-      if (nextButton) {
-        await nextButton.click();
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        // Go back
-        const prevButton = await page.$('.fc-prev-button, .fc-left > .fc-button-group > button:first-child, button[title="précédent"], button[title="Précédent"]');
-        if (prevButton) {
-          await prevButton.click();
-        }
-      }
-
-      calendarEvents = await eventPromise;
-    }
-
-    // Method 3: If still no events, scrape the DOM directly
-    if (calendarEvents.length === 0) {
-      console.log('[login] Method 2 failed, trying DOM scraping...');
-      calendarEvents = await page.evaluate(() => {
-        const events = [];
-        const eventEls = document.querySelectorAll('.fc-event, .fc-day-grid-event, .fc-time-grid-event, [class*="event"]');
-        eventEls.forEach((el, i) => {
-          const titleEl = el.querySelector('.fc-title, .fc-list-item-title, .event-title');
-          const timeEl = el.querySelector('.fc-time, .fc-list-item-time, .event-time');
-          if (titleEl) {
-            events.push({
-              id: `dom-${i}`,
-              title: titleEl.textContent.trim(),
-              start: el.getAttribute('data-start') || timeEl?.textContent || '',
-              end: el.getAttribute('data-end') || '',
-              className: el.className || '',
-            });
-          }
-        });
-        return events;
-      });
-    }
-
-    console.log(`[login] Found ${calendarEvents.length} events`);
+    // Collect events from all months of the academic year
+    const allEvents = await scrapeAllMonths(page);
+    console.log(`[login] Found ${allEvents.length} total events across all months`);
 
     // Process events into our format
-    const processedEvents = calendarEvents
+    const processedEvents = allEvents
       .filter(e => !e.is_empty && !e.is_break)
       .map(e => {
         const parsed = parseEventTitle(e.title);
@@ -388,6 +268,15 @@ app.post('/api/login-and-fetch', async (req, res) => {
           allDay: e.allDay || false,
         };
       });
+
+    // Deduplicate events by start+title
+    const seen = new Set();
+    const uniqueEvents = processedEvents.filter(e => {
+      const key = `${e.start}_${e.title}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     // Generate session token and store the browser session
     const token = generateToken();

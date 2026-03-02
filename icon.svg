@@ -1,0 +1,22 @@
+<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="100" fill="#0a0e1a"/>
+  
+  <g transform="translate(100, 100) scale(6.5)">
+    <rect x="4" y="8" width="40" height="32" rx="4" stroke="url(#grad-icon)" stroke-width="2.5"/>
+    <line x1="4" y1="16" x2="44" y2="16" stroke="url(#grad-icon)" stroke-width="2"/>
+    <line x1="16" y1="16" x2="16" y2="40" stroke="url(#grad-icon)" stroke-width="1.5" opacity="0.5"/>
+    <line x1="28" y1="16" x2="28" y2="40" stroke="url(#grad-icon)" stroke-width="1.5" opacity="0.5"/>
+    <line x1="4" y1="26" x2="44" y2="26" stroke="url(#grad-icon)" stroke-width="1.5" opacity="0.5"/>
+    <line x1="4" y1="34" x2="44" y2="34" stroke="url(#grad-icon)" stroke-width="1.5" opacity="0.5"/>
+    <circle cx="10" cy="12" r="2" fill="#ff6b6b"/>
+    <circle cx="17" cy="12" r="2" fill="#ffd93d"/>
+    <circle cx="24" cy="12" r="2" fill="#6bcb77"/>
+    <defs>
+      <linearGradient id="grad-icon" x1="0" y1="0" x2="48" y2="48">
+        <stop offset="0%" stop-color="#a855f7"/>
+        <stop offset="50%" stop-color="#6366f1"/>
+        <stop offset="100%" stop-color="#06b6d4"/>
+      </linearGradient>
+    </defs>
+  </g>
+</svg>
