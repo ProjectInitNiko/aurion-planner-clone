@@ -1,4 +1,4 @@
-const CACHE_NAME = 'supmeca-planning-v1';
+const CACHE_NAME = 'supmeca-planning-v2';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -21,7 +21,7 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
     return;
   }
-  
+
   // Don't intercept API calls
   if (event.request.url.includes('/api/')) {
     return;
@@ -35,9 +35,9 @@ self.addEventListener('fetch', event => {
           return response;
         }
         return fetch(event.request).then(
-          function(response) {
+          function (response) {
             // Check if we received a valid response
-            if(!response || response.status !== 200 || response.type !== 'basic') {
+            if (!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
 
@@ -48,7 +48,7 @@ self.addEventListener('fetch', event => {
             var responseToCache = response.clone();
 
             caches.open(CACHE_NAME)
-              .then(function(cache) {
+              .then(function (cache) {
                 cache.put(event.request, responseToCache);
               });
 
