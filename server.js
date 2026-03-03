@@ -118,27 +118,31 @@ function getEventType(className, title) {
  * Returns: { token, events: [...], period: { start, end } }
  */
 app.post('/api/login-and-fetch', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, forceRefresh } = req.body;
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Identifiant et mot de passe requis' });
   }
 
-  // Check Supabase cache first
-  try {
-    const cached = await getCachedEvents(username);
-    if (cached && isCacheFresh(cached.lastUpdated, 2)) {
-      console.log(`[login] Returning ${cached.events.length} cached events for ${username} (fresh)`);
-      return res.json({
-        token: generateToken(),
-        events: cached.events,
-        fromCache: true,
-        cachedAt: cached.lastUpdated,
-        message: `${cached.events.length} événements (cache). Données mises à jour il y a moins de 2h.`,
-      });
+  // Check Supabase cache first (if not forcing refresh)
+  if (!forceRefresh) {
+    try {
+      const cached = await getCachedEvents(username);
+      if (cached && isCacheFresh(cached.lastUpdated, 24)) {
+        console.log(`[login] Returning ${cached.events.length} cached events for ${username} (fresh)`);
+        return res.json({
+          token: generateToken(),
+          events: cached.events,
+          fromCache: true,
+          cachedAt: cached.lastUpdated,
+          message: `${cached.events.length} événements (cache). Données mises à jour il y a moins de 24h.`,
+        });
+      }
+    } catch (e) {
+      console.warn('[login] Cache check failed, proceeding with Aurion:', e.message);
     }
-  } catch (e) {
-    console.warn('[login] Cache check failed, proceeding with Aurion:', e.message);
+  } else {
+    console.log(`[login] Force refresh requested for ${username}, bypassing cache...`);
   }
 
   let browser;

@@ -698,21 +698,37 @@ function exportICS() {
 
 // --- Refresh ---
 async function refreshPlanning() {
-    if (!state.token) {
-        // No active session, go back to login
+    if (!state.username) {
         scheduleView.classList.remove('active');
         loginView.classList.add('active');
         return;
     }
 
+    const password = $('#password').value;
+    if (!password) {
+        alert("Mot de passe manquant pour rafraîchir.");
+        return;
+    }
+
     loadingOverlay.hidden = false;
     try {
-        const res = await fetch(`${API_BASE}/api/navigate`, {
+        const res = await fetch(`${API_BASE}/api/login-and-fetch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: state.token, direction: 'today' }),
+            body: JSON.stringify({
+                username: state.username,
+                password: password,
+                forceRefresh: true
+            }),
         });
+
         const data = await res.json();
+
+        if (data.error) {
+            alert("Erreur de rafraîchissement : " + data.error);
+            return;
+        }
+
         if (data.events && data.events.length > 0) {
             state.events = data.events;
             localStorage.setItem('supmeca_planning_cache', JSON.stringify({
@@ -720,10 +736,11 @@ async function refreshPlanning() {
                 username: state.username,
                 cachedAt: new Date().toISOString(),
             }));
+            renderSchedule();
         }
-        renderSchedule();
     } catch (error) {
         console.error('Refresh failed:', error);
+        alert("Impossible de rafraîchir le planning.");
     } finally {
         loadingOverlay.hidden = true;
     }
