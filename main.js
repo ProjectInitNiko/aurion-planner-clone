@@ -683,13 +683,18 @@ function exportICS() {
 
 // --- Refresh ---
 async function refreshPlanning() {
-    if (!state.username || !state._password) {
+    if (!state.username) {
         scheduleView.classList.remove('active');
         loginView.classList.add('active');
         return;
     }
 
-    const password = state._password;
+    let password = state._password;
+    if (!password) {
+        password = prompt("Veuillez entrer votre mot de passe Aurion pour rafraîchir le planning :");
+        if (!password) return; // User cancelled
+        state._password = password; // Save it for this session
+    }
 
     loadingOverlay.hidden = false;
     try {
