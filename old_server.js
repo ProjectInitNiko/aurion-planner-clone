@@ -246,61 +246,6 @@ app.post('/api/login-and-fetch', async (req, res) => {
       console.log('[login] Switched to month view');
     }
 
-    // Helper function to scrape all events across multiple months
-    async function scrapeAllMonths(page) {
-      let allEvents = [];
-      const MAX_MONTHS = 10;
-
-      for (let i = 0; i < MAX_MONTHS; i++) {
-        const eventPromise = new Promise((resolve) => {
-          const timeout = setTimeout(() => resolve([]), 5000);
-          const responseHandler = async (response) => {
-            try {
-              if (response.headers()['content-type']?.includes('xml')) {
-                const text = await response.text();
-                if (text.includes('partial-response')) {
-                  const jsonResult = JSON.parse(convert.xml2json(text, { compact: true, spaces: 2 }));
-                  const updates = jsonResult['partial-response']?.['changes']?.['update'];
-                  if (updates) {
-                    const updateArray = Array.isArray(updates) ? updates : [updates];
-                    for (const update of updateArray) {
-                      if (update['_cdata']) {
-                        try {
-                          const parsed = JSON.parse(update['_cdata']);
-                          if (parsed.events) {
-                            clearTimeout(timeout);
-                            page.off('response', responseHandler);
-                            resolve(parsed.events);
-                            return;
-                          }
-                        } catch (e) { /* ignore */ }
-                      }
-                    }
-                  }
-                }
-              }
-            } catch (e) { /* ignore */ }
-          };
-          page.on('response', responseHandler);
-        });
-
-        // Click next month
-        const nextButton = await page.$('.fc-next-button');
-        if (nextButton) {
-          await nextButton.click();
-        } else {
-          break; // Stop if no next button
-        }
-
-        const events = await eventPromise;
-        allEvents = [...allEvents, ...events];
-
-        // Stop fetching if we reach summer vacation (July/August emptiness heuristically)
-        if (i > 3 && events.length === 0) break;
-      }
-      return allEvents;
-    }
-
     // Collect events from all months of the academic year
     const allEvents = await scrapeAllMonths(page);
     console.log(`[login] Found ${allEvents.length} total events across all months`);

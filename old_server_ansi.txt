@@ -64,10 +64,10 @@ function parseEventTitle(title) {
     /^[A-Z]{1,3}[-\s]?\d{1,4}$/,      // e.g. B-201, TD3
   ];
 
-  // Try to extract professor (usually "Prénom NOM" or "M. NOM" pattern)
+  // Try to extract professor (usually "Pr??nom NOM" or "M. NOM" pattern)
   const profPatterns = [
     /^(M\.|Mme|Mr|Pr|Dr)\s/i,
-    /^[A-ZÉÈÊËÀÂÄÙÛÜÔÖÏÎ][a-zéèêëàâäùûüôöïî]+\s[A-ZÉÈÊËÀÂÄÙÛÜÔÖÏÎ]{2,}/,  // "Prénom NOM"
+    /^[A-Z????????????????????????????][a-z????????????????????????????]+\s[A-Z????????????????????????????]{2,}/,  // "Pr??nom NOM"
   ];
 
   for (const line of lines) {
@@ -103,12 +103,12 @@ function getEventType(className, title) {
   const cl = (className || '').toLowerCase();
   const t = (title || '').toLowerCase();
 
-  if (cl.includes('epreuve') || cl.includes('exam') || t.includes('examen') || t.includes('partiel') || t.includes('épreuve')) return 'exam';
+  if (cl.includes('epreuve') || cl.includes('exam') || t.includes('examen') || t.includes('partiel') || t.includes('??preuve')) return 'exam';
   if (t.includes(' td') || t.includes('td ') || cl.includes('td')) return 'td';
   if (t.includes(' tp') || t.includes('tp ') || cl.includes('tp')) return 'tp';
   if (t.includes(' cm') || t.includes('cm ') || t.includes('cours magistral') || cl.includes('cm')) return 'cm';
   if (t.includes('projet') || cl.includes('projet')) return 'projet';
-  if (t.includes('réunion') || t.includes('reunion')) return 'reunion';
+  if (t.includes('r??union') || t.includes('reunion')) return 'reunion';
   return 'cours';
 }
 
@@ -134,7 +134,7 @@ app.post('/api/login-and-fetch', async (req, res) => {
         events: cached.events,
         fromCache: true,
         cachedAt: cached.lastUpdated,
-        message: `${cached.events.length} événements (cache). Données mises à jour il y a moins de 2h.`,
+        message: `${cached.events.length} ??v??nements (cache). Donn??es mises ?? jour il y a moins de 2h.`,
       });
     }
   } catch (e) {
@@ -189,7 +189,7 @@ app.post('/api/login-and-fetch', async (req, res) => {
       });
       await browser.close();
       return res.status(401).json({
-        error: errorMsg || 'Identifiants incorrects. Vérifiez votre login et mot de passe.',
+        error: errorMsg || 'Identifiants incorrects. V??rifiez votre login et mot de passe.',
       });
     }
 
@@ -246,61 +246,6 @@ app.post('/api/login-and-fetch', async (req, res) => {
       console.log('[login] Switched to month view');
     }
 
-    // Helper function to scrape all events across multiple months
-    async function scrapeAllMonths(page) {
-      let allEvents = [];
-      const MAX_MONTHS = 10;
-
-      for (let i = 0; i < MAX_MONTHS; i++) {
-        const eventPromise = new Promise((resolve) => {
-          const timeout = setTimeout(() => resolve([]), 5000);
-          const responseHandler = async (response) => {
-            try {
-              if (response.headers()['content-type']?.includes('xml')) {
-                const text = await response.text();
-                if (text.includes('partial-response')) {
-                  const jsonResult = JSON.parse(convert.xml2json(text, { compact: true, spaces: 2 }));
-                  const updates = jsonResult['partial-response']?.['changes']?.['update'];
-                  if (updates) {
-                    const updateArray = Array.isArray(updates) ? updates : [updates];
-                    for (const update of updateArray) {
-                      if (update['_cdata']) {
-                        try {
-                          const parsed = JSON.parse(update['_cdata']);
-                          if (parsed.events) {
-                            clearTimeout(timeout);
-                            page.off('response', responseHandler);
-                            resolve(parsed.events);
-                            return;
-                          }
-                        } catch (e) { /* ignore */ }
-                      }
-                    }
-                  }
-                }
-              }
-            } catch (e) { /* ignore */ }
-          };
-          page.on('response', responseHandler);
-        });
-
-        // Click next month
-        const nextButton = await page.$('.fc-next-button');
-        if (nextButton) {
-          await nextButton.click();
-        } else {
-          break; // Stop if no next button
-        }
-
-        const events = await eventPromise;
-        allEvents = [...allEvents, ...events];
-
-        // Stop fetching if we reach summer vacation (July/August emptiness heuristically)
-        if (i > 3 && events.length === 0) break;
-      }
-      return allEvents;
-    }
-
     // Collect events from all months of the academic year
     const allEvents = await scrapeAllMonths(page);
     console.log(`[login] Found ${allEvents.length} total events across all months`);
@@ -351,7 +296,7 @@ app.post('/api/login-and-fetch', async (req, res) => {
       token,
       events: processedEvents,
       fromCache: false,
-      message: `Connecté en tant que ${username}. ${processedEvents.length} événements trouvés.`,
+      message: `Connect?? en tant que ${username}. ${processedEvents.length} ??v??nements trouv??s.`,
     });
 
   } catch (error) {
@@ -373,7 +318,7 @@ app.post('/api/navigate', async (req, res) => {
 
   const session = sessions.get(token);
   if (!session) {
-    return res.status(401).json({ error: 'Session expirée. Veuillez vous reconnecter.' });
+    return res.status(401).json({ error: 'Session expir??e. Veuillez vous reconnecter.' });
   }
 
   session.lastUsed = Date.now();
@@ -468,7 +413,7 @@ app.post('/api/logout', async (req, res) => {
     await session.browser.close().catch(() => { });
     sessions.delete(token);
   }
-  res.json({ message: 'Déconnecté' });
+  res.json({ message: 'D??connect??' });
 });
 
 /**
@@ -507,8 +452,8 @@ app.get('/api/health', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n🚀 Supmeca Planning Server running on http://localhost:${PORT}`);
-  console.log(`📡 API endpoints:`);
+  console.log(`\n???? Supmeca Planning Server running on http://localhost:${PORT}`);
+  console.log(`???? API endpoints:`);
   console.log(`   POST /api/login-and-fetch  - Login & fetch planning`);
   console.log(`   POST /api/cached-events    - Get cached events`);
   console.log(`   POST /api/navigate         - Navigate calendar`);
