@@ -246,63 +246,95 @@ app.post('/api/login-and-fetch', async (req, res) => {
       console.log('[login] Switched to month view');
     }
 
-    // Helper function to scrape all events across multiple months
-    async function scrapeAllMonths(page) {
-      let allEvents = [];
-      const MAX_MONTHS = 10;
-
-      for (let i = 0; i < MAX_MONTHS; i++) {
-        const eventPromise = new Promise((resolve) => {
-          const timeout = setTimeout(() => resolve([]), 5000);
-          const responseHandler = async (response) => {
-            try {
-              if (response.headers()['content-type']?.includes('xml')) {
-                const text = await response.text();
-                if (text.includes('partial-response')) {
-                  const jsonResult = JSON.parse(convert.xml2json(text, { compact: true, spaces: 2 }));
-                  const updates = jsonResult['partial-response']?.['changes']?.['update'];
-                  if (updates) {
-                    const updateArray = Array.isArray(updates) ? updates : [updates];
-                    for (const update of updateArray) {
-                      if (update['_cdata']) {
-                        try {
-                          const parsed = JSON.parse(update['_cdata']);
-                          if (parsed.events) {
-                            clearTimeout(timeout);
-                            page.off('response', responseHandler);
-                            resolve(parsed.events);
-                            return;
-                          }
-                        } catch (e) { /* ignore */ }
-                      }
+    // Helper: intercept one calendar navigation and return events
+    async function scrapeOneNavigation(page, buttonSelector) {
+      const eventPromise = new Promise((resolve) => {
+        const timeout = setTimeout(() => resolve([]), 3000);
+        const handler = async (response) => {
+          try {
+            if (response.headers()['content-type']?.includes('xml')) {
+              const text = await response.text();
+              if (text.includes('partial-response')) {
+                const jsonResult = JSON.parse(convert.xml2json(text, { compact: true, spaces: 2 }));
+                const updates = jsonResult['partial-response']?.['changes']?.['update'];
+                if (updates) {
+                  const arr = Array.isArray(updates) ? updates : [updates];
+                  for (const u of arr) {
+                    if (u['_cdata']) {
+                      try {
+                        const parsed = JSON.parse(u['_cdata']);
+                        if (parsed.events) {
+                          clearTimeout(timeout);
+                          page.off('response', handler);
+                          resolve(parsed.events);
+                          return;
+                        }
+                      } catch (e) { /* ignore */ }
                     }
                   }
                 }
               }
-            } catch (e) { /* ignore */ }
-          };
-          page.on('response', responseHandler);
-        });
+            }
+          } catch (e) { /* ignore */ }
+        };
+        page.on('response', handler);
+      });
 
-        // Click next month
-        const nextButton = await page.$('.fc-next-button');
-        if (nextButton) {
-          await nextButton.click();
-        } else {
-          break; // Stop if no next button
-        }
+      const btn = await page.$(buttonSelector);
+      if (btn) await btn.click();
+      else return [];
 
-        const events = await eventPromise;
-        allEvents = [...allEvents, ...events];
-
-        // Stop fetching if we reach summer vacation (July/August emptiness heuristically)
-        if (i > 3 && events.length === 0) break;
-      }
-      return allEvents;
+      return await eventPromise;
     }
 
-    // Collect events from all months of the academic year
-    const allEvents = await scrapeAllMonths(page);
+    // Step 1: Get current month events directly from FullCalendar
+    console.log('[scrape] Extracting current month events...');
+    let currentMonthEvents = await page.evaluate(() => {
+      try {
+        const calEl = document.querySelector('.fc, [class*="fullcalendar"], #calendar, .schedule-calendar');
+        if (calEl && (typeof jQuery !== 'undefined' || typeof $ !== 'undefined')) {
+          const $cal = (typeof jQuery !== 'undefined' ? jQuery : $)(calEl);
+          const events = $cal.fullCalendar('clientEvents');
+          return events.map(e => ({
+            id: e.id || e._id,
+            title: e.title || '',
+            start: e.start ? (e.start.toISOString ? e.start.toISOString() : e.start.format ? e.start.format() : String(e.start)) : '',
+            end: e.end ? (e.end.toISOString ? e.end.toISOString() : e.end.format ? e.end.format() : String(e.end)) : '',
+            className: typeof e.className === 'string' ? e.className : (Array.isArray(e.className) ? e.className.join(' ') : ''),
+            allDay: e.allDay || false,
+          }));
+        }
+      } catch (e) { /* ignore */ }
+      return [];
+    });
+    console.log(`[scrape] Current month: ${currentMonthEvents.length} events`);
+
+    // Step 2: Navigate FORWARD (up to 4 months: Apr, May, Jun, Jul)
+    let forwardEvents = [];
+    for (let i = 0; i < 4; i++) {
+      const events = await scrapeOneNavigation(page, '.fc-next-button');
+      if (events.length === 0 && i > 1) break; // Stop at empty summer months
+      forwardEvents = [...forwardEvents, ...events];
+      console.log(`[scrape] Forward month ${i + 1}: ${events.length} events`);
+    }
+
+    // Step 3: Go back to current month first
+    const todayBtn = await page.$('.fc-today-button');
+    if (todayBtn) {
+      await todayBtn.click();
+      await new Promise(r => setTimeout(r, 1500));
+    }
+
+    // Step 4: Navigate BACKWARD (up to 5 months: Feb, Jan, Dec, Nov, Oct, Sep)
+    let backwardEvents = [];
+    for (let i = 0; i < 6; i++) {
+      const events = await scrapeOneNavigation(page, '.fc-prev-button');
+      if (events.length === 0 && i > 1) break; // Stop if we reach before Sept
+      backwardEvents = [...backwardEvents, ...events];
+      console.log(`[scrape] Backward month ${i + 1}: ${events.length} events`);
+    }
+
+    const allEvents = [...backwardEvents, ...currentMonthEvents, ...forwardEvents];
     console.log(`[login] Found ${allEvents.length} total events across all months`);
 
     // Process events into our format
