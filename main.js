@@ -8,6 +8,7 @@ const API_BASE = window.location.origin;
 const state = {
     token: null,
     username: '',
+    _password: '',
     events: [],
     currentDate: new Date(),
     selectedDay: new Date(),
@@ -188,6 +189,7 @@ async function handleLogin(e) {
         // Success
         state.token = data.token;
         state.username = username;
+        state._password = password;
         state.events = data.events || [];
 
         // Cache the data locally too
@@ -698,17 +700,13 @@ function exportICS() {
 
 // --- Refresh ---
 async function refreshPlanning() {
-    if (!state.username) {
+    if (!state.username || !state._password) {
         scheduleView.classList.remove('active');
         loginView.classList.add('active');
         return;
     }
 
-    const password = $('#password').value;
-    if (!password) {
-        alert("Mot de passe manquant pour rafraîchir.");
-        return;
-    }
+    const password = state._password;
 
     loadingOverlay.hidden = false;
     try {

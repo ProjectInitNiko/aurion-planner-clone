@@ -521,7 +521,7 @@ app.post('/api/cached-events', async (req, res) => {
       return res.json({
         events: cached.events,
         cachedAt: cached.lastUpdated,
-        fresh: isCacheFresh(cached.lastUpdated, 2),
+        fresh: isCacheFresh(cached.lastUpdated, 24),
       });
     }
     res.json({ events: [], cachedAt: null, fresh: false });
