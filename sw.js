@@ -1,4 +1,4 @@
-const CACHE_NAME = 'supmeca-planning-v2';
+const CACHE_NAME = 'supmeca-planning-v3';
 const urlsToCache = [
   '/',
   '/index.html',

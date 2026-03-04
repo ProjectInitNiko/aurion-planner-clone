@@ -150,24 +150,7 @@ async function handleLogin(e) {
                 state.events = cacheData.events;
                 showSchedule();
                 showedCache = true;
-
-                // If cache is fresh, we can skip the full login
-                if (cacheData.fresh) {
-                    console.log('[login] Cache is fresh, skipping Aurion scraping');
-                    // Still do the login to get a token for navigation
-                    fetch(`${API_BASE}/api/login-and-fetch`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, password }),
-                    }).then(res => res.json()).then(data => {
-                        if (data.token) state.token = data.token;
-                        if (data.events && !data.fromCache) {
-                            state.events = data.events;
-                            renderSchedule();
-                        }
-                    }).catch(() => { });
-                    return;
-                }
+                console.log(`[login] Showing ${cacheData.events.length} cached events while fetching fresh data...`);
             }
         } catch (e) {
             console.log('[login] No cache available, proceeding with login');
