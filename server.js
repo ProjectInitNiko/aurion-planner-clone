@@ -356,14 +356,16 @@ app.post('/api/login-and-fetch', async (req, res) => {
         };
       });
 
-    // Deduplicate events by start+title
+    // Deduplicate events by start+end+title
     const seen = new Set();
     const uniqueEvents = processedEvents.filter(e => {
-      const key = `${e.start}_${e.title}`;
+      const key = `${e.start}_${e.end}_${e.title}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
+
+    console.log(`[login] ${processedEvents.length} events -> ${uniqueEvents.length} after dedup`);
 
     // Generate session token and store the browser session
     const token = generateToken();
@@ -375,15 +377,15 @@ app.post('/api/login-and-fetch', async (req, res) => {
     });
 
     // Save events to Supabase cache
-    saveEvents(username, processedEvents).catch(e => {
+    saveEvents(username, uniqueEvents).catch(e => {
       console.warn('[login] Failed to cache events:', e.message);
     });
 
     res.json({
       token,
-      events: processedEvents,
+      events: uniqueEvents,
       fromCache: false,
-      message: `Connecté en tant que ${username}. ${processedEvents.length} événements trouvés.`,
+      message: `Connecté en tant que ${username}. ${uniqueEvents.length} événements trouvés.`,
     });
 
   } catch (error) {
